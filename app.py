@@ -198,7 +198,7 @@ def main():
                 if cover_id:
                     # Use Drive thumbnail URL - no download needed
                     thumbnail_url = f"https://drive.google.com/thumbnail?id={cover_id}&sz=w300"
-                    st.image(thumbnail_url, use_container_width=True)
+                    st.image(thumbnail_url, use_column_width=True)
                 else:
                     st.markdown(
                         '<div style="width:100%;height:200px;background:#333;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:48px;">📖</div>',
