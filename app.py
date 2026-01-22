@@ -40,6 +40,13 @@ def get_drive_service():
 PRICE_CENTS = 499
 PRICE_DISPLAY = "$4.99"
 
+def normalize_name(name):
+    n = name.lower()
+    n = n.replace(" ebook", "").replace(" paper", "").replace(" new", "")
+    n = n.replace("-", " ").replace("_", " ")
+    n = " ".join(n.split())
+    return n
+
 @st.cache_data(ttl=3600)
 def get_all_files(_service):
     books = {}
@@ -50,8 +57,9 @@ def get_all_files(_service):
         current_folder = folders_to_search.pop()
         query = f"'{current_folder}' in parents and trashed=false"
         page_token = None
-        folder_books = []
-        folder_images = []
+        folder_books = {}
+        folder_images = {}
+        
         while True:
             results = _service.files().list(
                 q=query,
@@ -60,23 +68,38 @@ def get_all_files(_service):
                 pageToken=page_token,
                 pageSize=1000
             ).execute()
+            
             for f in results.get("files", []):
                 name = f["name"]
                 mime = f.get("mimeType", "")
+                
                 if mime == "application/vnd.google-apps.folder":
                     folders_to_search.append(f["id"])
                 elif name.upper().endswith("EBOOK.DOCX"):
-                    title = name.replace(".docx", "").replace(".DOCX", "")
+                    title = name[:-5]
                     books[title] = f["id"]
-                    folder_books.append(title)
+                    normalized = normalize_name(title)
+                    folder_books[normalized] = title
                 elif name.lower().endswith(".jpg") or name.lower().endswith(".png"):
-                    folder_images.append(f["id"])
+                    base = name.rsplit(".", 1)[0]
+                    normalized = normalize_name(base)
+                    folder_images[normalized] = f["id"]
+            
             page_token = results.get("nextPageToken")
             if not page_token:
                 break
-        if folder_books and folder_images:
-            for book_title in folder_books:
-                covers[book_title] = folder_images[0]
+        
+        for norm_title, full_title in folder_books.items():
+            best_match = None
+            for norm_img, img_id in folder_images.items():
+                if norm_title in norm_img or norm_img in norm_title:
+                    best_match = img_id
+                    break
+            if best_match:
+                covers[full_title] = best_match
+            elif folder_images:
+                covers[full_title] = list(folder_images.values())[0]
+    
     return books, covers
 
 def download_file(service, file_id):
@@ -159,14 +182,24 @@ def main():
     
     titles = sorted(filtered_books.keys())
     cols_per_row = 4
+    books_per_page = 20
     
-    for i in range(0, len(titles), cols_per_row):
+    total_pages = (len(titles) + books_per_page - 1) // books_per_page
+    page = st.number_input("Page", min_value=1, max_value=max(1, total_pages), value=1, step=1)
+    start_idx = (page - 1) * books_per_page
+    end_idx = start_idx + books_per_page
+    page_titles = titles[start_idx:end_idx]
+    
+    st.markdown(f"Page {page} of {total_pages}")
+    st.markdown("---")
+    
+    for i in range(0, len(page_titles), cols_per_row):
         cols = st.columns(cols_per_row)
         for j, col in enumerate(cols):
             idx = i + j
-            if idx >= len(titles):
+            if idx >= len(page_titles):
                 break
-            title = titles[idx]
+            title = page_titles[idx]
             file_id = filtered_books[title]
             
             with col:
@@ -175,7 +208,7 @@ def main():
                     img_b64 = get_cover_base64(service, cover_id)
                     if img_b64:
                         st.markdown(
-                            f'<img src="data:image/jpeg;base64,{img_b64}" style="width:100%;border-radius:8px;">',
+                            f'<img src="data:image/*;base64,{img_b64}" style="width:100%;border-radius:8px;">',
                             unsafe_allow_html=True
                         )
                     else:
