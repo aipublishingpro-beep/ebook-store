@@ -252,16 +252,16 @@ def main():
     
     with col1:
         if page > 1:
-            if st.button("⬅️ Previous Page", use_container_width=True):
+            if st.button("⬅️ Previous Page"):
                 st.session_state.current_page -= 1
                 st.rerun()
     
     with col2:
-        st.markdown(f"<center>Page {page} of {total_pages}</center>", unsafe_allow_html=True)
+        st.write(f"Page {page} of {total_pages}")
     
     with col3:
         if page < total_pages:
-            if st.button("Next Page ➡️", use_container_width=True):
+            if st.button("Next Page ➡️"):
                 st.session_state.current_page += 1
                 st.rerun()
 
