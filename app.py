@@ -160,8 +160,8 @@ def create_checkout_session(title, price_cents, book_id):
 def main():
     if 'descriptions' not in st.session_state:
         st.session_state.descriptions = {}
-    if 'current_page' not in st.session_state:
-        st.session_state.current_page = 1
+    if 'books_loaded' not in st.session_state:
+        st.session_state.books_loaded = 12
     
     st.title("📚 William Liu Books")
     st.markdown("---")
@@ -171,11 +171,11 @@ def main():
     
     search = st.text_input("🔍 Search books", "")
     
-    # Reset page when search changes
+    # Reset when search changes
     if 'last_search' not in st.session_state:
         st.session_state.last_search = ""
     if search != st.session_state.last_search:
-        st.session_state.current_page = 1
+        st.session_state.books_loaded = 12
         st.session_state.last_search = search
     
     filtered_books = {}
@@ -186,25 +186,22 @@ def main():
     
     titles = sorted(filtered_books.keys())
     cols_per_row = 4
-    books_per_page = 12
     
-    total_pages = max(1, (len(titles) + books_per_page - 1) // books_per_page)
-    page = st.session_state.current_page
+    # Show all loaded books
+    visible_titles = titles[:st.session_state.books_loaded]
     
-    start_idx = (page - 1) * books_per_page
-    end_idx = start_idx + books_per_page
-    page_titles = titles[start_idx:end_idx]
-    
-    st.markdown(f"**Showing {len(page_titles)} of {len(filtered_books)} books** | Page {page} of {total_pages}")
+    showing = len(visible_titles)
+    total = len(filtered_books)
+    st.markdown(f"**Showing {showing} of {total} books**")
     st.markdown("---")
     
-    for i in range(0, len(page_titles), cols_per_row):
+    for i in range(0, len(visible_titles), cols_per_row):
         cols = st.columns(cols_per_row)
         for j, col in enumerate(cols):
             idx = i + j
-            if idx >= len(page_titles):
+            if idx >= len(visible_titles):
                 break
-            title = page_titles[idx]
+            title = visible_titles[idx]
             file_id = filtered_books[title]
             
             with col:
@@ -247,23 +244,15 @@ def main():
     
     st.markdown("---")
     
-    # Navigation buttons
-    col1, col2, col3 = st.columns([1, 2, 1])
-    
-    with col1:
-        if page > 1:
-            if st.button("⬅️ Previous Page"):
-                st.session_state.current_page -= 1
-                st.rerun()
-    
-    with col2:
-        st.write(f"Page {page} of {total_pages}")
-    
-    with col3:
-        if page < total_pages:
-            if st.button("Next Page ➡️"):
-                st.session_state.current_page += 1
-                st.rerun()
+    # Load More button
+    if st.session_state.books_loaded < len(titles):
+        remaining = len(titles) - st.session_state.books_loaded
+        if st.button(f"📚 Load More Books ({remaining} remaining)"):
+            st.session_state.books_loaded += 12
+            st.rerun()
+    else:
+        if len(titles) > 0:
+            st.success("✅ You've seen all the books!")
 
 if __name__ == "__main__":
     main()
