@@ -5,7 +5,6 @@ from googleapiclient.http import MediaIoBaseDownload
 import stripe
 import io
 import docx2txt
-import base64
 
 st.set_page_config(page_title="William Liu Books", layout="wide")
 
@@ -131,14 +130,6 @@ def get_description(service, file_id):
     except:
         return "A compelling read by William Liu."
 
-@st.cache_data(ttl=3600)
-def get_cover_base64(_service, file_id):
-    try:
-        buffer = download_file(_service, file_id)
-        return base64.b64encode(buffer.read()).decode()
-    except:
-        return None
-
 def create_checkout_session(title, price_cents, book_id):
     session = stripe.checkout.Session.create(
         payment_method_types=["card"],
@@ -161,7 +152,7 @@ def main():
     if 'descriptions' not in st.session_state:
         st.session_state.descriptions = {}
     if 'books_to_show' not in st.session_state:
-        st.session_state.books_to_show = 24
+        st.session_state.books_to_show = 12
     
     st.title("📚 William Liu Books")
     st.markdown("---")
@@ -177,13 +168,20 @@ def main():
             continue
         filtered_books[title] = file_id
     
-    st.markdown(f"**Showing {min(st.session_state.books_to_show, len(filtered_books))} of {len(filtered_books)} books**")
+    # Reset view count when search changes
+    if 'last_search' not in st.session_state:
+        st.session_state.last_search = ""
+    if search != st.session_state.last_search:
+        st.session_state.books_to_show = 12
+        st.session_state.last_search = search
+    
+    showing = min(st.session_state.books_to_show, len(filtered_books))
+    st.markdown(f"**Showing {showing} of {len(filtered_books)} books**")
     st.markdown("---")
     
     titles = sorted(filtered_books.keys())
     cols_per_row = 4
     
-    # Only show up to books_to_show
     visible_titles = titles[:st.session_state.books_to_show]
     
     for i in range(0, len(visible_titles), cols_per_row):
@@ -198,14 +196,9 @@ def main():
             with col:
                 cover_id = covers.get(title)
                 if cover_id:
-                    img_b64 = get_cover_base64(service, cover_id)
-                    if img_b64:
-                        st.markdown(
-                            f'<img src="data:image/*;base64,{img_b64}" style="width:100%;border-radius:8px;">',
-                            unsafe_allow_html=True
-                        )
-                    else:
-                        st.markdown("📖", unsafe_allow_html=True)
+                    # Use Drive thumbnail URL - no download needed
+                    thumbnail_url = f"https://drive.google.com/thumbnail?id={cover_id}&sz=w300"
+                    st.image(thumbnail_url, use_container_width=True)
                 else:
                     st.markdown(
                         '<div style="width:100%;height:200px;background:#333;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:48px;">📖</div>',
@@ -235,13 +228,13 @@ def main():
     
     st.markdown("---")
     
-    # Load More button
+    # Next Page button
     if st.session_state.books_to_show < len(titles):
         remaining = len(titles) - st.session_state.books_to_show
         col1, col2, col3 = st.columns([1, 2, 1])
         with col2:
             if st.button(f"📚 Next Page ({remaining} remaining)", use_container_width=True):
-                st.session_state.books_to_show += 24
+                st.session_state.books_to_show += 12
                 st.rerun()
     else:
         st.markdown("**You've seen all the books!**")
