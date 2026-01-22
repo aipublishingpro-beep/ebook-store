@@ -182,7 +182,7 @@ def main():
     
     titles = sorted(filtered_books.keys())
     cols_per_row = 4
-    books_per_page = 20
+    books_per_page = 12
     
     total_pages = max(1, (len(titles) + books_per_page - 1) // books_per_page)
     page = st.number_input("Page", min_value=1, max_value=total_pages, value=1, step=1)
@@ -224,8 +224,7 @@ def main():
                 st.caption(PRICE_DISPLAY)
                 
                 with st.expander("Description"):
-                    desc = get_description(service, file_id)
-                    st.write(desc)
+                    st.write("A compelling read by William Liu.")
                 
                 if st.button(f"Buy {PRICE_DISPLAY}", key=f"buy_{file_id}"):
                     checkout_url = create_checkout_session(title, PRICE_CENTS, file_id)
