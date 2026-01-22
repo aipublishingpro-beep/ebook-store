@@ -5,6 +5,7 @@ from googleapiclient.http import MediaIoBaseDownload
 import stripe
 import io
 import docx2txt
+import base64
 
 st.set_page_config(page_title="William Liu Books", layout="wide")
 
@@ -130,6 +131,14 @@ def get_description(service, file_id):
     except:
         return "A compelling read by William Liu."
 
+@st.cache_data(ttl=3600)
+def get_cover_base64(_service, file_id):
+    try:
+        buffer = download_file(_service, file_id)
+        return base64.b64encode(buffer.read()).decode()
+    except:
+        return None
+
 def create_checkout_session(title, price_cents, book_id):
     session = stripe.checkout.Session.create(
         payment_method_types=["card"],
@@ -151,8 +160,8 @@ def create_checkout_session(title, price_cents, book_id):
 def main():
     if 'descriptions' not in st.session_state:
         st.session_state.descriptions = {}
-    if 'books_to_show' not in st.session_state:
-        st.session_state.books_to_show = 12
+    if 'current_page' not in st.session_state:
+        st.session_state.current_page = 1
     
     st.title("📚 William Liu Books")
     st.markdown("---")
@@ -162,43 +171,53 @@ def main():
     
     search = st.text_input("🔍 Search books", "")
     
+    # Reset page when search changes
+    if 'last_search' not in st.session_state:
+        st.session_state.last_search = ""
+    if search != st.session_state.last_search:
+        st.session_state.current_page = 1
+        st.session_state.last_search = search
+    
     filtered_books = {}
     for title, file_id in books.items():
         if search.lower() and search.lower() not in title.lower():
             continue
         filtered_books[title] = file_id
     
-    # Reset view count when search changes
-    if 'last_search' not in st.session_state:
-        st.session_state.last_search = ""
-    if search != st.session_state.last_search:
-        st.session_state.books_to_show = 12
-        st.session_state.last_search = search
-    
-    showing = min(st.session_state.books_to_show, len(filtered_books))
-    st.markdown(f"**Showing {showing} of {len(filtered_books)} books**")
-    st.markdown("---")
-    
     titles = sorted(filtered_books.keys())
     cols_per_row = 4
+    books_per_page = 12
     
-    visible_titles = titles[:st.session_state.books_to_show]
+    total_pages = max(1, (len(titles) + books_per_page - 1) // books_per_page)
+    page = st.session_state.current_page
     
-    for i in range(0, len(visible_titles), cols_per_row):
+    start_idx = (page - 1) * books_per_page
+    end_idx = start_idx + books_per_page
+    page_titles = titles[start_idx:end_idx]
+    
+    st.markdown(f"**Showing {len(page_titles)} of {len(filtered_books)} books** | Page {page} of {total_pages}")
+    st.markdown("---")
+    
+    for i in range(0, len(page_titles), cols_per_row):
         cols = st.columns(cols_per_row)
         for j, col in enumerate(cols):
             idx = i + j
-            if idx >= len(visible_titles):
+            if idx >= len(page_titles):
                 break
-            title = visible_titles[idx]
+            title = page_titles[idx]
             file_id = filtered_books[title]
             
             with col:
                 cover_id = covers.get(title)
                 if cover_id:
-                    # Use Drive thumbnail URL - no download needed
-                    thumbnail_url = f"https://drive.google.com/thumbnail?id={cover_id}&sz=w300"
-                    st.image(thumbnail_url, use_column_width=True)
+                    img_b64 = get_cover_base64(service, cover_id)
+                    if img_b64:
+                        st.markdown(
+                            f'<img src="data:image/*;base64,{img_b64}" style="width:100%;border-radius:8px;">',
+                            unsafe_allow_html=True
+                        )
+                    else:
+                        st.markdown("📖", unsafe_allow_html=True)
                 else:
                     st.markdown(
                         '<div style="width:100%;height:200px;background:#333;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:48px;">📖</div>',
@@ -228,16 +247,23 @@ def main():
     
     st.markdown("---")
     
-    # Next Page button
-    if st.session_state.books_to_show < len(titles):
-        remaining = len(titles) - st.session_state.books_to_show
-        col1, col2, col3 = st.columns([1, 2, 1])
-        with col2:
-            if st.button(f"📚 Next Page ({remaining} remaining)", use_container_width=True):
-                st.session_state.books_to_show += 12
+    # Navigation buttons
+    col1, col2, col3 = st.columns([1, 2, 1])
+    
+    with col1:
+        if page > 1:
+            if st.button("⬅️ Previous Page", use_container_width=True):
+                st.session_state.current_page -= 1
                 st.rerun()
-    else:
-        st.markdown("**You've seen all the books!**")
+    
+    with col2:
+        st.markdown(f"<center>Page {page} of {total_pages}</center>", unsafe_allow_html=True)
+    
+    with col3:
+        if page < total_pages:
+            if st.button("Next Page ➡️", use_container_width=True):
+                st.session_state.current_page += 1
+                st.rerun()
 
 if __name__ == "__main__":
     main()
