@@ -160,8 +160,45 @@ def create_checkout_session(title, price_cents, book_id):
 def main():
     if 'descriptions' not in st.session_state:
         st.session_state.descriptions = {}
-    if 'books_loaded' not in st.session_state:
-        st.session_state.books_loaded = 12
+    if 'current_page' not in st.session_state:
+        st.session_state.current_page = 1
+    
+    service = get_drive_service()
+    
+    # Check if this is a successful purchase
+    params = st.query_params
+    if "book" in params:
+        book_id = params["book"]
+        st.title("🎉 Thank You For Your Purchase!")
+        st.markdown("---")
+        st.success("Your payment was successful!")
+        
+        try:
+            # Get the file info
+            file_info = service.files().get(fileId=book_id, fields="name").execute()
+            filename = file_info.get("name", "book.docx")
+            
+            st.markdown(f"**Your book:** {filename.replace('.docx', '')}")
+            
+            # Download button
+            if st.button("📥 Download Your Book"):
+                with st.spinner("Preparing download..."):
+                    buffer = download_file(service, book_id)
+                    st.download_button(
+                        label="💾 Click to Save",
+                        data=buffer,
+                        file_name=filename,
+                        mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                        key="save_book"
+                    )
+        except Exception as e:
+            st.error("There was an issue accessing your book. Please contact support.")
+        
+        st.markdown("---")
+        if st.button("🏠 Back to Store"):
+            st.query_params.clear()
+            st.rerun()
+        return
     
     st.title("📚 William Liu Books")
     st.markdown("---")
@@ -175,7 +212,7 @@ def main():
     if 'last_search' not in st.session_state:
         st.session_state.last_search = ""
     if search != st.session_state.last_search:
-        st.session_state.books_loaded = 12
+        st.session_state.current_page = 1
         st.session_state.last_search = search
     
     filtered_books = {}
@@ -186,22 +223,25 @@ def main():
     
     titles = sorted(filtered_books.keys())
     cols_per_row = 4
+    books_per_page = 24
     
-    # Show all loaded books
-    visible_titles = titles[:st.session_state.books_loaded]
+    total_pages = max(1, (len(titles) + books_per_page - 1) // books_per_page)
+    page = st.session_state.current_page
     
-    showing = len(visible_titles)
-    total = len(filtered_books)
-    st.markdown(f"**Showing {showing} of {total} books**")
+    start_idx = (page - 1) * books_per_page
+    end_idx = start_idx + books_per_page
+    page_titles = titles[start_idx:end_idx]
+    
+    st.markdown(f"**Showing {len(page_titles)} of {len(filtered_books)} books** | Page {page} of {total_pages}")
     st.markdown("---")
     
-    for i in range(0, len(visible_titles), cols_per_row):
+    for i in range(0, len(page_titles), cols_per_row):
         cols = st.columns(cols_per_row)
         for j, col in enumerate(cols):
             idx = i + j
-            if idx >= len(visible_titles):
+            if idx >= len(page_titles):
                 break
-            title = visible_titles[idx]
+            title = page_titles[idx]
             file_id = filtered_books[title]
             
             with col:
@@ -244,15 +284,23 @@ def main():
     
     st.markdown("---")
     
-    # Load More button
-    if st.session_state.books_loaded < len(titles):
-        remaining = len(titles) - st.session_state.books_loaded
-        if st.button(f"📚 Load More Books ({remaining} remaining)"):
-            st.session_state.books_loaded += 12
-            st.rerun()
-    else:
-        if len(titles) > 0:
-            st.success("✅ You've seen all the books!")
+    # Navigation
+    col1, col2, col3 = st.columns([1, 1, 1])
+    
+    with col1:
+        if page > 1:
+            if st.button("⬅️ Previous"):
+                st.session_state.current_page -= 1
+                st.rerun()
+    
+    with col2:
+        st.write(f"Page {page} of {total_pages}")
+    
+    with col3:
+        if page < total_pages:
+            if st.button("Next ➡️"):
+                st.session_state.current_page += 1
+                st.rerun()
 
 if __name__ == "__main__":
     main()
