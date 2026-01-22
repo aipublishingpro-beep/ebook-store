@@ -184,8 +184,9 @@ def main():
     cols_per_row = 4
     books_per_page = 20
     
-    total_pages = (len(titles) + books_per_page - 1) // books_per_page
-    page = st.number_input("Page", min_value=1, max_value=max(1, total_pages), value=1, step=1)
+    total_pages = max(1, (len(titles) + books_per_page - 1) // books_per_page)
+    page = st.number_input("Page", min_value=1, max_value=total_pages, value=1, step=1)
+    
     start_idx = (page - 1) * books_per_page
     end_idx = start_idx + books_per_page
     page_titles = titles[start_idx:end_idx]
