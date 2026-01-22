@@ -219,7 +219,7 @@ def main():
     
     titles = sorted(filtered_books.keys())
     cols_per_row = 4
-    books_per_page = 24
+    books_per_page = 12
     
     total_pages = max(1, (len(titles) + books_per_page - 1) // books_per_page)
     page = st.session_state.current_page
