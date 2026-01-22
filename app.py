@@ -4,7 +4,7 @@ from googleapiclient.discovery import build
 from googleapiclient.http import MediaIoBaseDownload
 import stripe
 import io
-from docx import Document
+import docx2txt
 import base64
 
 st.set_page_config(page_title="William Liu Books", layout="wide")
@@ -112,26 +112,21 @@ def download_file(service, file_id):
     buffer.seek(0)
     return buffer
 
-@st.cache_data(ttl=3600)
-def get_description(_service, file_id):
+def get_description(service, file_id):
     try:
-        buffer = download_file(_service, file_id)
-        doc = Document(buffer)
-        found_chapter = False
-        for para in doc.paragraphs:
-            text = para.text.strip()
-            lower = text.lower()
-            if "chapter" in lower or "introduction" in lower or "prologue" in lower:
-                found_chapter = True
+        buffer = download_file(service, file_id)
+        text = docx2txt.process(buffer)
+        paragraphs = [p.strip() for p in text.split("\n\n") if p.strip()]
+        found = False
+        for p in paragraphs:
+            l = p.lower()
+            if any(k in l for k in ["chapter", "introduction", "prologue"]):
+                found = True
                 continue
-            if found_chapter and len(text) > 100:
-                if "all rights reserved" in lower:
+            if found and len(p) > 100:
+                if any(bad in l for bad in ["copyright", "all rights reserved", "reproduced"]):
                     continue
-                if "copyright" in lower:
-                    continue
-                if "reproduced" in lower:
-                    continue
-                return text[:300] + "..." if len(text) > 300 else text
+                return p[:300] + "..."
         return "A compelling read by William Liu."
     except:
         return "A compelling read by William Liu."
@@ -163,6 +158,9 @@ def create_checkout_session(title, price_cents, book_id):
     return session.url
 
 def main():
+    if 'descriptions' not in st.session_state:
+        st.session_state.descriptions = {}
+    
     st.title("📚 William Liu Books")
     st.markdown("---")
     
@@ -224,7 +222,17 @@ def main():
                 st.caption(PRICE_DISPLAY)
                 
                 with st.expander("Description"):
-                    st.write("A compelling read by William Liu.")
+                    desc_key = f"desc_{file_id}"
+                    if desc_key in st.session_state.descriptions:
+                        st.write(st.session_state.descriptions[desc_key])
+                    else:
+                        if st.button("Load Description", key=f"load_{file_id}"):
+                            with st.spinner("Loading..."):
+                                desc = get_description(service, file_id)
+                                st.session_state.descriptions[desc_key] = desc
+                                st.rerun()
+                        else:
+                            st.write("Click to load description")
                 
                 if st.button(f"Buy {PRICE_DISPLAY}", key=f"buy_{file_id}"):
                     checkout_url = create_checkout_session(title, PRICE_CENTS, file_id)
