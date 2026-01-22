@@ -174,13 +174,11 @@ def main():
         st.success("Your payment was successful!")
         
         try:
-            # Get the file info
             file_info = service.files().get(fileId=book_id, fields="name").execute()
             filename = file_info.get("name", "book.docx")
             
             st.markdown(f"**Your book:** {filename.replace('.docx', '')}")
             
-            # Download button
             if st.button("📥 Download Your Book"):
                 with st.spinner("Preparing download..."):
                     buffer = download_file(service, book_id)
@@ -191,7 +189,7 @@ def main():
                         mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
                         key="save_book"
                     )
-        except Exception as e:
+        except:
             st.error("There was an issue accessing your book. Please contact support.")
         
         st.markdown("---")
@@ -203,12 +201,10 @@ def main():
     st.title("📚 William Liu Books")
     st.markdown("---")
     
-    service = get_drive_service()
     books, covers = get_all_files(service)
     
     search = st.text_input("🔍 Search books", "")
     
-    # Reset when search changes
     if 'last_search' not in st.session_state:
         st.session_state.last_search = ""
     if search != st.session_state.last_search:
@@ -233,6 +229,22 @@ def main():
     page_titles = titles[start_idx:end_idx]
     
     st.markdown(f"**Showing {len(page_titles)} of {len(filtered_books)} books** | Page {page} of {total_pages}")
+    
+    # TOP NAVIGATION
+    col1, col2, col3 = st.columns([1, 1, 1])
+    with col1:
+        if page > 1:
+            if st.button("⬅️ Previous", key="prev_top"):
+                st.session_state.current_page -= 1
+                st.rerun()
+    with col2:
+        st.write(f"Page {page} of {total_pages}")
+    with col3:
+        if page < total_pages:
+            if st.button("Next ➡️", key="next_top"):
+                st.session_state.current_page += 1
+                st.rerun()
+    
     st.markdown("---")
     
     for i in range(0, len(page_titles), cols_per_row):
@@ -284,21 +296,18 @@ def main():
     
     st.markdown("---")
     
-    # Navigation
+    # BOTTOM NAVIGATION
     col1, col2, col3 = st.columns([1, 1, 1])
-    
     with col1:
         if page > 1:
-            if st.button("⬅️ Previous"):
+            if st.button("⬅️ Previous", key="prev_bottom"):
                 st.session_state.current_page -= 1
                 st.rerun()
-    
     with col2:
         st.write(f"Page {page} of {total_pages}")
-    
     with col3:
         if page < total_pages:
-            if st.button("Next ➡️"):
+            if st.button("Next ➡️", key="next_bottom"):
                 st.session_state.current_page += 1
                 st.rerun()
 
