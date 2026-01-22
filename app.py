@@ -89,9 +89,20 @@ def get_description(_service, file_id):
     try:
         buffer = download_file(_service, file_id)
         doc = Document(buffer)
+        found_chapter = False
         for para in doc.paragraphs:
             text = para.text.strip()
-            if len(text) > 50:
+            lower = text.lower()
+            if "chapter" in lower or "introduction" in lower or "prologue" in lower:
+                found_chapter = True
+                continue
+            if found_chapter and len(text) > 100:
+                if "all rights reserved" in lower:
+                    continue
+                if "copyright" in lower:
+                    continue
+                if "reproduced" in lower:
+                    continue
                 return text[:300] + "..." if len(text) > 300 else text
         return "A compelling read by William Liu."
     except:
