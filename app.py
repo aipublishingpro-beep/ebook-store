@@ -160,6 +160,8 @@ def create_checkout_session(title, price_cents, book_id):
 def main():
     if 'descriptions' not in st.session_state:
         st.session_state.descriptions = {}
+    if 'books_to_show' not in st.session_state:
+        st.session_state.books_to_show = 24
     
     st.title("📚 William Liu Books")
     st.markdown("---")
@@ -175,30 +177,22 @@ def main():
             continue
         filtered_books[title] = file_id
     
-    st.markdown(f"**Showing {len(filtered_books)} of {len(books)} books**")
+    st.markdown(f"**Showing {min(st.session_state.books_to_show, len(filtered_books))} of {len(filtered_books)} books**")
     st.markdown("---")
     
     titles = sorted(filtered_books.keys())
     cols_per_row = 4
-    books_per_page = 12
     
-    total_pages = max(1, (len(titles) + books_per_page - 1) // books_per_page)
-    page = st.number_input("Page", min_value=1, max_value=total_pages, value=1, step=1)
+    # Only show up to books_to_show
+    visible_titles = titles[:st.session_state.books_to_show]
     
-    start_idx = (page - 1) * books_per_page
-    end_idx = start_idx + books_per_page
-    page_titles = titles[start_idx:end_idx]
-    
-    st.markdown(f"Page {page} of {total_pages}")
-    st.markdown("---")
-    
-    for i in range(0, len(page_titles), cols_per_row):
+    for i in range(0, len(visible_titles), cols_per_row):
         cols = st.columns(cols_per_row)
         for j, col in enumerate(cols):
             idx = i + j
-            if idx >= len(page_titles):
+            if idx >= len(visible_titles):
                 break
-            title = page_titles[idx]
+            title = visible_titles[idx]
             file_id = filtered_books[title]
             
             with col:
@@ -238,8 +232,19 @@ def main():
                     checkout_url = create_checkout_session(title, PRICE_CENTS, file_id)
                     st.markdown(f'<meta http-equiv="refresh" content="0;url={checkout_url}">', unsafe_allow_html=True)
                     st.write(f"[Click here if not redirected]({checkout_url})")
-        
-        st.markdown("---")
+    
+    st.markdown("---")
+    
+    # Load More button
+    if st.session_state.books_to_show < len(titles):
+        remaining = len(titles) - st.session_state.books_to_show
+        col1, col2, col3 = st.columns([1, 2, 1])
+        with col2:
+            if st.button(f"📚 Next Page ({remaining} remaining)", use_container_width=True):
+                st.session_state.books_to_show += 24
+                st.rerun()
+    else:
+        st.markdown("**You've seen all the books!**")
 
 if __name__ == "__main__":
     main()
