@@ -50,6 +50,8 @@ def get_all_files(_service):
         current_folder = folders_to_search.pop()
         query = f"'{current_folder}' in parents and trashed=false"
         page_token = None
+        folder_books = []
+        folder_images = []
         while True:
             results = _service.files().list(
                 q=query,
@@ -64,14 +66,17 @@ def get_all_files(_service):
                 if mime == "application/vnd.google-apps.folder":
                     folders_to_search.append(f["id"])
                 elif name.upper().endswith("EBOOK.DOCX"):
-                    title = name.replace(".docx", "")
+                    title = name.replace(".docx", "").replace(".DOCX", "")
                     books[title] = f["id"]
-                elif name.endswith("_cover.jpg") or name.endswith("_cover.png"):
-                    title = name.rsplit("_cover", 1)[0]
-                    covers[title] = f["id"]
+                    folder_books.append(title)
+                elif name.lower().endswith(".jpg") or name.lower().endswith(".png"):
+                    folder_images.append(f["id"])
             page_token = results.get("nextPageToken")
             if not page_token:
                 break
+        if folder_books and folder_images:
+            for book_title in folder_books:
+                covers[book_title] = folder_images[0]
     return books, covers
 
 def download_file(service, file_id):
