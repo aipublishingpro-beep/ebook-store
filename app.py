@@ -37,8 +37,8 @@ def get_drive_service():
     )
     return build("drive", "v3", credentials=creds)
 
-PRICE_CENTS = 499
-PRICE_DISPLAY = "$4.99"
+PRICE_CENTS = 100
+PRICE_DISPLAY = "$1.00"
 
 def normalize_name(name):
     n = name.lower()
