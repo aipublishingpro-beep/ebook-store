@@ -44,27 +44,34 @@ PRICE_DISPLAY = "$4.99"
 def get_all_files(_service):
     books = {}
     covers = {}
-    query = f"'{FOLDER_ID}' in parents and trashed=false"
-    page_token = None
-    while True:
-        results = _service.files().list(
-            q=query,
-            spaces="drive",
-            fields="nextPageToken, files(id, name, mimeType)",
-            pageToken=page_token,
-            pageSize=1000
-        ).execute()
-        for f in results.get("files", []):
-            name = f["name"]
-            if name.endswith(".docx"):
-                title = name.replace(".docx", "")
-                books[title] = f["id"]
-            elif name.endswith("_cover.jpg") or name.endswith("_cover.png"):
-                title = name.rsplit("_cover", 1)[0]
-                covers[title] = f["id"]
-        page_token = results.get("nextPageToken")
-        if not page_token:
-            break
+    folders_to_search = [FOLDER_ID]
+    
+    while folders_to_search:
+        current_folder = folders_to_search.pop()
+        query = f"'{current_folder}' in parents and trashed=false"
+        page_token = None
+        while True:
+            results = _service.files().list(
+                q=query,
+                spaces="drive",
+                fields="nextPageToken, files(id, name, mimeType)",
+                pageToken=page_token,
+                pageSize=1000
+            ).execute()
+            for f in results.get("files", []):
+                name = f["name"]
+                mime = f.get("mimeType", "")
+                if mime == "application/vnd.google-apps.folder":
+                    folders_to_search.append(f["id"])
+                elif name.endswith(".docx"):
+                    title = name.replace(".docx", "")
+                    books[title] = f["id"]
+                elif name.endswith("_cover.jpg") or name.endswith("_cover.png"):
+                    title = name.rsplit("_cover", 1)[0]
+                    covers[title] = f["id"]
+            page_token = results.get("nextPageToken")
+            if not page_token:
+                break
     return books, covers
 
 def download_file(service, file_id):
