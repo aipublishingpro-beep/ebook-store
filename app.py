@@ -1,9 +1,9 @@
 import streamlit as st
-import json, os, math
+import json, os
 
 # ── Config ──
 CATALOG_DIR = "catalog"
-# cache bust v2
+BOOKS_PER_PAGE = 40
 STRIPE_KEY = os.environ.get("STRIPE_SECRET_KEY", "")
 SUCCESS_URL = os.environ.get("SUCCESS_URL", "https://your-app.streamlit.app/?success=true&book={CHECKOUT_SESSION_ID}")
 CANCEL_URL = os.environ.get("CANCEL_URL", "https://your-app.streamlit.app/?canceled=true")
@@ -37,8 +37,17 @@ def load_page(page_num):
     with open(path, "r", encoding="utf-8") as f:
         return json.load(f)
 
+# ── Load ALL books (for search + sort) ──
+@st.cache_data
+def load_all_books(total_pages):
+    all_b = []
+    for i in range(1, total_pages + 1):
+        all_b.extend(load_page(i))
+    all_b.sort(key=lambda b: b.get("title", "").lower())
+    return all_b
+
 manifest = load_manifest()
-total_pages = manifest.get("total_pages", 1)
+total_pages_file = manifest.get("total_pages", 1)
 total_books = manifest.get("total_books", 0)
 categories = manifest.get("categories", {})
 
@@ -66,42 +75,48 @@ if params.get("success") == "true":
 if params.get("canceled") == "true":
     st.warning("Purchase canceled. You were not charged.")
 
+# ── Load all books (sorted A-Z) ──
+all_books = load_all_books(total_pages_file)
+
 # ── Header ──
 st.title("📚 William Liu Books")
 st.caption(f"{total_books} books available")
 
-# ── Category filter (top of page) ──
+# ── Category filter ──
 all_cats = ["All"] + sorted(categories.keys())
-selected_cat = st.radio(
-    "Browse by category",
-    all_cats,
-    horizontal=True,
-    index=0
-)
+selected_cat = st.radio("Browse by category", all_cats, horizontal=True, index=0)
 
 # ── Sidebar ──
 st.sidebar.header("📖 Navigation")
-page = st.sidebar.number_input("Page", min_value=1, max_value=total_pages, value=1, step=1)
-st.sidebar.caption(f"Page {page} of {total_pages}")
 search = st.sidebar.text_input("🔍 Search", "").strip().lower()
 
-# ── Load selected page ──
-books = load_page(page)
+# ── Filter books ──
+filtered = all_books
 
-# ── Apply category filter ──
 if selected_cat != "All":
-    books = [b for b in books if b.get("category", "Fiction") == selected_cat]
+    filtered = [b for b in filtered if b.get("category", "Fiction") == selected_cat]
 
-# ── Apply search filter ──
 if search:
-    books = [b for b in books if
-             search in b.get("title", "").lower() or
-             search in b.get("description", "").lower()]
-    st.info(f"Found {len(books)} results on page {page} for '{search}'")
+    filtered = [b for b in filtered if
+                search in b.get("title", "").lower() or
+                search in b.get("description", "").lower()]
+    st.info(f"Found {len(filtered)} results for '{search}'")
+
+# ── Paginate filtered results ──
+import math
+total_filtered = len(filtered)
+total_pages_display = max(1, math.ceil(total_filtered / BOOKS_PER_PAGE))
+
+page = st.sidebar.number_input("Page", min_value=1, max_value=total_pages_display, value=1, step=1)
+st.sidebar.caption(f"Page {page} of {total_pages_display} • {total_filtered} books")
+
+start = (page - 1) * BOOKS_PER_PAGE
+end = start + BOOKS_PER_PAGE
+books = filtered[start:end]
 
 # ── Display grid ──
 if not books:
-    st.info("No books on this page matching your filters. Try another page or category.")
+    st.info("No books matching your filters.")
 else:
     COLS = 4
     rows = [books[i:i + COLS] for i in range(0, len(books), COLS)]
@@ -169,11 +184,5 @@ else:
 # ── Bottom nav ──
 st.divider()
 c1, c2, c3 = st.columns([1, 2, 1])
-with c1:
-    if page > 1:
-        st.markdown(f"⬅️ Previous: change page to {page - 1} in sidebar")
 with c2:
-    st.caption(f"Page {page} of {total_pages} • {total_books} books")
-with c3:
-    if page < total_pages:
-        st.markdown(f"Next: change page to {page + 1} in sidebar ➡️")
+    st.caption(f"Page {page} of {total_pages_display} • {total_filtered} books")
