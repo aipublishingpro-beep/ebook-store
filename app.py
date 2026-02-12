@@ -1,9 +1,10 @@
 import streamlit as st
-import json, os
+import json, os, math
 
 # ── Config ──
 CATALOG_DIR = "catalog"
 BOOKS_PER_PAGE = 40
+
 try:
     STRIPE_KEY = st.secrets["stripe"]["secret_key"]
 except Exception:
@@ -46,7 +47,7 @@ def load_page(page_num):
     with open(path, "r", encoding="utf-8") as f:
         return json.load(f)
 
-# ── Load ALL books (for search + sort) ──
+# ── Load ALL books (only when searching or filtering) ──
 @st.cache_data
 def load_all_books(total_pages):
     all_b = []
@@ -84,9 +85,6 @@ if params.get("success") == "true":
 if params.get("canceled") == "true":
     st.warning("Purchase canceled. You were not charged.")
 
-# ── Load all books (sorted A-Z) ──
-all_books = load_all_books(total_pages_file)
-
 # ── Header ──
 st.title("📚 William Liu Books")
 st.caption(f"{total_books} books available")
@@ -99,29 +97,31 @@ selected_cat = st.radio("Browse by category", all_cats, horizontal=True, index=0
 st.sidebar.header("📖 Navigation")
 search = st.sidebar.text_input("🔍 Search", "").strip().lower()
 
-# ── Filter books ──
-filtered = all_books
+# ── Decide: search/filter mode vs fast page mode ──
+need_all = search or selected_cat != "All"
 
-if selected_cat != "All":
-    filtered = [b for b in filtered if b.get("category", "Fiction") == selected_cat]
-
-if search:
-    filtered = [b for b in filtered if
-                search in b.get("title", "").lower() or
-                search in b.get("description", "").lower()]
-    st.info(f"Found {len(filtered)} results for '{search}'")
-
-# ── Paginate filtered results ──
-import math
-total_filtered = len(filtered)
-total_pages_display = max(1, math.ceil(total_filtered / BOOKS_PER_PAGE))
-
-page = st.sidebar.number_input("Page", min_value=1, max_value=total_pages_display, value=1, step=1)
-st.sidebar.caption(f"Page {page} of {total_pages_display} • {total_filtered} books")
-
-start = (page - 1) * BOOKS_PER_PAGE
-end = start + BOOKS_PER_PAGE
-books = filtered[start:end]
+if need_all:
+    all_books = load_all_books(total_pages_file)
+    filtered = all_books
+    if selected_cat != "All":
+        filtered = [b for b in filtered if b.get("category", "Fiction") == selected_cat]
+    if search:
+        filtered = [b for b in filtered if
+                    search in b.get("title", "").lower() or
+                    search in b.get("description", "").lower()]
+        st.info(f"Found {len(filtered)} results for '{search}'")
+    total_filtered = len(filtered)
+    total_pages_display = max(1, math.ceil(total_filtered / BOOKS_PER_PAGE))
+    page = st.sidebar.number_input("Page", min_value=1, max_value=total_pages_display, value=1, step=1)
+    st.sidebar.caption(f"Page {page} of {total_pages_display} • {total_filtered} books")
+    start = (page - 1) * BOOKS_PER_PAGE
+    end = start + BOOKS_PER_PAGE
+    books = filtered[start:end]
+else:
+    # Fast mode: only load one page file at a time
+    page = st.sidebar.number_input("Page", min_value=1, max_value=total_pages_file, value=1, step=1)
+    st.sidebar.caption(f"Page {page} of {total_pages_file} • {total_books} books")
+    books = load_page(page)
 
 # ── Display grid ──
 if not books:
@@ -142,7 +142,7 @@ else:
                 cat = book.get("category", "")
 
                 if cover:
-                    st.image(cover, use_container_width=True)
+                    st.image(cover, width=300)
                 else:
                     st.markdown("📕")
 
@@ -194,4 +194,4 @@ else:
 st.divider()
 c1, c2, c3 = st.columns([1, 2, 1])
 with c2:
-    st.caption(f"Page {page} of {total_pages_display} • {total_filtered} books")
+    st.caption(f"Page {page} of {total_pages_file if not need_all else total_pages_display} • {total_books if not need_all else total_filtered} books")
