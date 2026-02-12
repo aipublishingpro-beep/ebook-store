@@ -3,6 +3,7 @@ import json, os, math
 
 # ── Config ──
 CATALOG_DIR = "catalog"
+# cache bust v2
 STRIPE_KEY = os.environ.get("STRIPE_SECRET_KEY", "")
 SUCCESS_URL = os.environ.get("SUCCESS_URL", "https://your-app.streamlit.app/?success=true&book={CHECKOUT_SESSION_ID}")
 CANCEL_URL = os.environ.get("CANCEL_URL", "https://your-app.streamlit.app/?canceled=true")
