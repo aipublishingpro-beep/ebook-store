@@ -1,0 +1,11 @@
+{
+  "total_books": 508,
+  "books_per_page": 40,
+  "total_pages": 13,
+  "categories": {
+    "Fiction": 299,
+    "Nonfiction": 112,
+    "Romantasy": 74,
+    "Romance": 23
+  }
+}
