@@ -4,9 +4,9 @@ import json, os
 # ── Config ──
 CATALOG_DIR = "catalog"
 BOOKS_PER_PAGE = 40
-STRIPE_KEY = os.environ.get("STRIPE_SECRET_KEY", "")
-SUCCESS_URL = os.environ.get("SUCCESS_URL", "https://your-app.streamlit.app/?success=true&book={CHECKOUT_SESSION_ID}")
-CANCEL_URL = os.environ.get("CANCEL_URL", "https://your-app.streamlit.app/?canceled=true")
+STRIPE_KEY = st.secrets.get("STRIPE_SECRET_KEY", "")
+SUCCESS_URL = st.secrets.get("SUCCESS_URL", "https://ebook-store-sm6epb55uc3xit4mv5iuhu.streamlit.app/?success=true&book={CHECKOUT_SESSION_ID}")
+CANCEL_URL = st.secrets.get("CANCEL_URL", "https://ebook-store-sm6epb55uc3xit4mv5iuhu.streamlit.app/?canceled=true")
 
 st.set_page_config(page_title="William Liu Books", page_icon="📚", layout="wide")
 
